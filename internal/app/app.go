@@ -7,8 +7,7 @@ import (
 
 	w "github.com/core-go/elasticsearch/batch"
 	im "github.com/core-go/io/importer"
-	rdr "github.com/core-go/io/reader"
-	"github.com/core-go/io/transform"
+	rd "github.com/core-go/io/reader"
 	v "github.com/core-go/io/validator"
 	"github.com/core-go/log/zap"
 	"github.com/elastic/go-elasticsearch/v8"
@@ -30,22 +29,22 @@ func NewApp(ctx context.Context, cfg Config) (*ApplicationContext, error) {
 	if err != nil {
 		return nil, err
 	}
-	fileType := rdr.DelimiterType
+	fileType := rd.DelimiterType
 	filename := ""
-	if fileType == rdr.DelimiterType {
+	if fileType == rd.DelimiterType {
 		filename = "delimiter.csv"
 	} else {
 		filename = "fixedlength.csv"
 	}
 	generateFileName := func() string {
-		fullPath := filepath.Join("export", filename)
+		fullPath := filepath.Join("data", filename)
 		return fullPath
 	}
-	reader, err := rdr.NewDelimiterFileReader(generateFileName)
+	reader, err := rd.NewFileReader(generateFileName)
 	if err != nil {
 		return nil, err
 	}
-	transformer, err := transform.NewDelimiterTransformer[User](",")
+	transformer, err := rd.NewDelimiterTransformer[User](",")
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +56,7 @@ func NewApp(ctx context.Context, cfg Config) (*ApplicationContext, error) {
 		"app": "import users",
 		"env": "dev",
 	}
-	errorHandler := im.NewErrorHandler[*User](log.ErrorFields, "fileName", "lineNo", mp)
+	errorHandler := im.NewErrorHandler[*User, string](log.ErrorFields, "fileName", "lineNo", mp)
 	writer := w.NewStreamWriter[*User](client, "userimport", 6)
 	importer := im.NewImporter[User](reader.Read, transformer.Transform, validator.Validate, errorHandler.HandleError, errorHandler.HandleException, filename, writer.Write, writer.Flush)
 	return &ApplicationContext{Import: importer.Import}, nil
